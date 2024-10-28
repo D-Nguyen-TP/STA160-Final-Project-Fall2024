@@ -1,0 +1,28 @@
+---
+title: "STA160 Final Project Code"
+author: "Duy Nguyen (919294020)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(tidycensus)
+library(sf)
+library(tigris)
+```
+
+```{r}
+dat = read_csv("Sacramento Average Anomaly.csv")
+```
+
+```{r}
+test = ts(dat$MAA, start = dat$Year[1], frequency = 1)
+ggplot(dat, mapping = aes(x = Year, y = MAA)) + geom_line() #Needs uncertainty range
+```
+
+
+
