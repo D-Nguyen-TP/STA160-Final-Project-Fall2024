@@ -10,9 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyverse)
 library(ggplot2)
-library(tidycensus)
 library(sf)
-library(tigris)
+library(TTR)
 ```
 
 ```{r}
@@ -21,8 +20,36 @@ dat = read_csv("Sacramento Average Anomaly.csv")
 
 ```{r}
 test = ts(dat$MAA, start = dat$Year[1], frequency = 1)
-ggplot(dat, mapping = aes(x = Year, y = MAA)) + geom_line() #Needs uncertainty range
+MA = SMA(dat$MAA, n = 15)
 ```
 
+```{r}
+ggplot(dat, mapping = aes(x = Year, y = MAA)) + 
+  geom_line(color = "blue") + 
+  geom_ribbon(aes(x = Year, y = MAA, ymin = dat$MAA - dat$Unc, ymax = dat$MAA + dat$Unc), alpha = 0.2) + 
+  labs(title = "Sacramento Average Anomaly", x = "Years", y = "Average Anomaly") + 
+  geom_line(aes(y = MA), color = "red")
+```
 
+```{r}
+ggplot(dat, aes(x = Year, y = Unc)) + geom_line() + labs(title = "Uncertainty levels of Sacramento Average Anomaly")
+```
+
+```{r}
+series = ts(dat$MAA, start = dat$Year[1])
+
+plot(SMA(series, n = 15))
+```
+
+```{r, eval = FALSE}
+full = read_csv("Sacramento Data Anomaly FULL.csv")
+```
+
+```{r}
+full = ts(full$Anomaly, frequency = 12)
+```
+
+```{r}
+plot(decompose(full))
+```
 
