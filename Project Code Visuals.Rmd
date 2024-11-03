@@ -12,6 +12,9 @@ library(tidyverse)
 library(ggplot2)
 library(sf)
 library(TTR)
+#library(ggfortify)
+library(forecast)
+library(timetk)
 ```
 
 ```{r}
@@ -22,7 +25,7 @@ dat = read_csv("Sacramento Average Anomaly.csv")
 test = ts(dat$MAA, start = dat$Year[1], frequency = 1)
 MA = SMA(dat$MAA, n = 15)
 ```
-
+EDA Stuff
 ```{r}
 ggplot(dat, mapping = aes(x = Year, y = MAA)) + 
   geom_line(color = "blue") + 
@@ -38,18 +41,35 @@ ggplot(dat, aes(x = Year, y = Unc)) + geom_line() + labs(title = "Uncertainty le
 ```{r}
 series = ts(dat$MAA, start = dat$Year[1])
 
-plot(SMA(series, n = 15))
-```
-
-```{r, eval = FALSE}
-full = read_csv("Sacramento Data Anomaly FULL.csv")
+autoplot(SMA(series, n = 15))
 ```
 
 ```{r}
-full = ts(full$Anomaly, frequency = 12)
+full_raw = read_csv("Sacramento Data Anomaly FULL.csv")
 ```
 
 ```{r}
-plot(decompose(full))
+full = ts(full_raw$Anomaly, frequency = 12)
+```
+
+```{r}
+full %>% decompose() %>% autoplot() + 
+  labs(title = "Decomposed Sacramento Time Series")
+```
+
+## Splitting the Data
+
+```{r}
+first = full = ts(full_raw$Anomaly[1:120], frequency = 12)
+last = full = ts(full_raw$Anomaly[1944:2064], frequency = 12)
+
+first %>% decompose() %>% autoplot()
+last %>% decompose() %>% autoplot()
+```
+
+```{r}
+# 5 folds cross validaation setup
+splits = list(c(1:34), c(35:69), c(70:104), c(105:139), c(140:172))
+dat[splits[[1]], ]
 ```
 
