@@ -1,0 +1,139 @@
+---
+title: "STA160 project"
+output: html_document
+date: "2024-11-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(TTR)
+#library(ggfortify)
+library(forecast)
+library(timetk)
+library(tseries)
+library(Metrics)
+```
+
+```{r}
+data1 <- read_csv("C:/Users/L0145/Downloads/Sacramento Average Anomaly.csv")
+data2 <- read_csv("C:/Users/L0145/Downloads/Sacramento Data Anomaly FULL.csv")
+```
+
+```{r}
+glimpse(data1)
+glimpse(data2)
+```
+
+```{r}
+model_linear <- lm(MAA ~ Year, data = data1)
+model_poly <- lm(MAA ~ poly(Year, 2), data = data1)
+
+aic_linear <- AIC(model_linear)
+bic_linear <- BIC(model_linear)
+
+aic_poly <- AIC(model_poly)
+bic_poly <- BIC(model_poly)
+
+
+cat("Linear Model - AIC:", aic_linear, "BIC:", bic_linear, "\n")
+cat("Polynomial Model - AIC:", aic_poly, "BIC:", bic_poly, "\n")
+```
+
+```{r}
+data2 <- data2 %>%
+  mutate(Date = as.Date(paste(Year, Month, "01", sep = "-")))
+anomaly_ts <- ts(data2$Anomaly, start = c(data2$Year[1], data2$Month[1]), frequency = 12)
+```
+
+```{r}
+arima_model <- auto.arima(anomaly_ts)
+summary(arima_model)
+
+aic_arima <- AIC(arima_model)
+bic_arima <- BIC(arima_model)
+
+cat("ARIMA Model - AIC:", aic_arima, "BIC:", bic_arima, "\n")
+
+forecast_arima <- forecast(arima_model, h = 12)
+plot(forecast_arima)
+```
+
+
+# Estimation of model performance
+```{r}
+class(anomaly_ts)
+anomaly_ts <- ts(data2$Anomaly, start = c(2000, 1), frequency = 12)
+```
+
+
+```{r}
+library(forecast)
+
+training_size <- 60  
+test_size <- 12 
+
+max_iterations <- 20
+
+rmse_values <- numeric()
+
+for (i in 1:min(max_iterations, length(anomaly_ts) - training_size - test_size + 1)) {
+  
+  cat("Training start:", i, " Training end:", i + training_size - 1, "\n")
+  cat("Test start:", i + training_size, " Test end:", i + training_size + test_size - 1, "\n")
+  
+  train_set <- window(anomaly_ts, start = c(2000, i), end = c(2000, i + training_size - 1))
+  test_set <- window(anomaly_ts, start = c(2000, i + training_size), end = c(2000, i + training_size + test_size - 1))
+  
+  if (length(train_set) != training_size | length(test_set) != test_size) {
+    cat("Error: Invalid window size. Check training and test ranges.\n")
+    next
+  }
+
+  arima_model <- auto.arima(train_set)
+  
+  forecasted_values <- forecast(arima_model, h = test_size)
+  
+  rmse_fold <- sqrt(mean((forecasted_values$mean - test_set)^2))
+  rmse_values[i] <- rmse_fold
+}
+
+mean_rmse <- mean(rmse_values)
+cat("Mean RMSE from Rolling Window Cross-Validation:", mean_rmse, "\n")
+```
+
+#Rolling Window Cross-Validation RMSE for ARIMA Model
+```{r}
+plot(1:20, rmse_values, type = "o", col = "blue", xlab = "Fold", ylab = "RMSE", 
+     main = "Rolling Window Cross-Validation RMSE for ARIMA Model")
+abline(h = mean_rmse, col = "red", lty = 2) 
+```
+#Plot comparing the Training vs Test data and forecasted values
+```{r}
+plot_training_test <- function(i) {
+
+  train_set <- window(anomaly_ts, start = c(2000, i), end = c(2000, i + training_size - 1))
+  test_set <- window(anomaly_ts, start = c(2000, i + training_size), end = c(2000, i + training_size + test_size - 1))
+
+  arima_model <- auto.arima(train_set)
+  
+  forecasted_values <- forecast(arima_model, h = test_size)
+
+  plot(train_set, xlim = c(start(train_set)[1], end(test_set)[1]), 
+       ylim = range(c(train_set, test_set, forecasted_values$mean)), 
+       xlab = "Year", ylab = "Anomaly", main = "Training vs Test Data with Forecasted Values", col = "blue")
+  
+
+  lines(test_set, col = "red")
+  lines(forecasted_values$mean, col = "green", lty = 2) 
+  
+  legend("topright", legend = c("Training Data", "Test Data", "Forecasted Data"), 
+         col = c("blue", "red", "green"), lty = c(1, 1, 2), bty = "n")
+}
+
+plot_training_test(1)
+```
+
