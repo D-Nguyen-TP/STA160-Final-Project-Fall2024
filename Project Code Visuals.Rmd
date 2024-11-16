@@ -24,16 +24,15 @@ dat = read_csv("Sacramento Average Anomaly.csv")
 
 ```{r}
 test = ts(dat$MAA, start = dat$Year[1], frequency = 1)
-MA = SMA(dat$MAA, n = 15)
 ```
 EDA Stuff
 ```{r}
 ggplot(dat, mapping = aes(x = Year, y = MAA)) + 
   geom_line() + 
-  geom_ribbon(aes(x = Year, y = MAA, ymin = MAA - Unc, ymax = MAA + Unc), alpha = 0.2) + 
-  labs(title = "Sacramento Average Anomaly", x = "Years", y = "Average Anomaly") + 
-  geom_line(aes(y = MA), color = "red") + 
-  geom_smooth(color = "blue", fill = "red")
+  #geom_ribbon(aes(x = Year, y = MAA, ymin = MAA - Unc, ymax = MAA + Unc), alpha = 0.2) + 
+  labs(title = "Sacramento Average Temperature Anomaly", x = "Years", y = "Average Anomaly") #+ 
+  #geom_line(aes(y = MA), color = "red") #+ 
+  #geom_smooth(color = "blue", fill = "red")
 ```
 
 ```{r}
@@ -51,74 +50,86 @@ full_raw = read_csv("Sacramento Data Anomaly FULL.csv")
 ```
 
 ```{r}
-full = ts(full_raw$Temps, start = full_raw$Year[1], frequency = 12)
+full = ts(full_raw$Temps, start = c(full_raw$Year[1], full_raw$Month[1]), frequency = 12)
 ```
 
 ```{r}
 
-autoplot(full)
-ggsave("test.png", width = 7, height = 3)
+autoplot(full) + 
+  labs(title = "Sacramento Monthly Average Temperatures", y = "Monthly Temperature")
+ggsave("test.png", width = 10, height = 3)
 ```
 
 
 ```{r}
 full %>% decompose() %>% autoplot() + 
-  labs(title = "Decomposed Sacramento Time Series") + 
+  labs(title = "Decomposed Sacramento Time Series Temperature") + 
   scale_x_continuous(breaks = scales::extended_breaks(10))
 ```
 
-## Splitting the Data
+## Splitting the Data for comparison
 
 ```{r}
-first = ts(full_raw$Anomaly[1:120], start = full_raw$Year[1], frequency = 12)
-last = ts(full_raw$Temps[1944:2064], start = full_raw$Year[1944], frequency = 12)
+first = ts(full_raw$Temps[1:720], start = c(full_raw$Year[1], full_raw$Month), frequency = 12)
+last = ts(full_raw$Temps[1584:2064], start = c(full_raw$Year[1584], full_raw$Month[1584]), frequency = 12)
 
 first %>% decompose() %>% autoplot()
 last %>% decompose() %>% autoplot()
 ```
 
-```{r}
+```{r, eval=FALSE}
 # 5 folds cross validaation setup
 splits = list(c(1:34), c(35:69), c(70:104), c(105:139), c(140:172))
 dat[splits[[1]], ]
 ```
 
+
 ```{r}
-June = full_raw %>% filter(Month == 6)
-December = full_raw %>% filter(Month == 12)
+wrong = ts(full_raw$Anomaly, start = c(full_raw$Year[1], full_raw$Month[1]), frequency = 12)
+seasonplot(wrong, main = "Seasonal Plot of Anomaly", ylab = "Anomaly")
 ```
 
 ```{r}
-ggplot(December, aes(x = Year, y = Anomaly)) + 
-  geom_line() + 
-  geom_line(aes(y = ma(December$Anomaly, 15)), color = "red")
 
-ggplot(June, aes(x = Year, y = Anomaly)) + 
-  geom_line() + 
-  geom_line(aes(y = ma(June$Anomaly, 15)), color = "red")
+seasonplot(full, col = rainbow(150), year.labels = F, 
+           main = "Seasonal Plot of Sacramento Temperatures")
 
 ```
+
+
+
+# Summary
+```{r}
+library(flextable)
+short_table = data.frame(matrix(ncol = 12, nrow = 5))
+months = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+#row_name = c("Min", "1st_Q", "Mean", "3rd_Q", "Max")
+#short_table[, 1] = row_name
+for (i in 1:12)
+{
+  temp = full_raw$Temps[full_raw$Month == i]
+  short_table[1, i] = min(temp)
+  short_table[2, i] = quantile(temp, 0.25)
+  short_table[3, i] = mean(temp)
+  short_table[4, i] = quantile(temp, 0.75)
+  short_table[5, i] = max(temp)
+}
+
+colnames(short_table) = months
+
+short_table = round(short_table, 2)
+short_table$Summary = c("Min", "1st_Q", "Mean", "3rd_Q", "Max") 
+short_table = short_table %>% select(Summary, everything()) %>% flextable()
+
+short_table
+save_as_image(short_table, path = "Short_table.png")
+```
+
+# Boxplots
 
 ```{r}
-seasonplot(last, col = rainbow(5))
-```
-
-
-```{r}
-test_mod = auto.arima(dat$MAA)
-
-pred = forecast(test_mod, h = 120)
-autoplot(pred)
+ggplot(full_raw, aes(x = as.factor(Month) ,  y = Temps)) + geom_boxplot()
 
 ```
-
-```{r}
-test_mod = auto.arima(full, D = 1)
-
-pred = forecast(test_mod, 36)
-
-autoplot(pred)
-
-```
-
 
