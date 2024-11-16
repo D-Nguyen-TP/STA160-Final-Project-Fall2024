@@ -1,0 +1,106 @@
+---
+title: "STA160 Final"
+output: html_document
+date: "2024-11-16"
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(TTR)
+#library(ggfortify)
+library(forecast)
+library(timetk)
+library(tseries)
+library(Metrics)
+```
+
+```{r}
+data1 <- read_csv("C:/Users/L0145/Downloads/Sacramento Average Anomaly.csv")
+data2 <- read_csv("C:/Users/L0145/Downloads/Sacramento Data Anomaly FULL.csv")
+
+head(data1)
+head(data2)
+```
+
+```{r}
+data_ts <- ts(data2$Anomaly, start = c(1849, 1), frequency = 12)
+```
+
+```{r}
+auto_model <- auto.arima(data_ts, seasonal = TRUE, stepwise = FALSE, approximation = FALSE)
+
+# Print the auto-selected model
+print(auto_model)
+
+# Display the AIC and BIC of the auto-selected model
+cat("AIC:", auto_model$aic, "\n")
+cat("BIC:", auto_model$bic, "\n")
+
+```
+
+```{r}
+acf(data_ts)
+pacf(data_ts)
+```
+
+```{r}
+# Model 1: Simple ARIMA with (1,1,0) without seasonality (based on observations from ACF/PACF)
+sarima_model1 <- Arima(data_ts, order = c(1,1,0))
+
+# Model 2: SARIMA with seasonal components (1,1,1)(1,1,0)[12] (try if seasonality exists)
+sarima_model2 <- Arima(data_ts, order = c(1,1,1), seasonal = c(1,1,0))
+
+# Model 3: SARIMA with (1,1,1)(0,1,1)[12] - alternative seasonal component if MA term is stronger
+sarima_model3 <- Arima(data_ts, order = c(1,1,1), seasonal = c(0,1,1))
+
+# Compare AIC and BIC
+cat("Model 1 - AIC:", sarima_model1$aic, " BIC:", sarima_model1$bic, "\n")
+cat("Model 2 - AIC:", sarima_model2$aic, " BIC:", sarima_model2$bic, "\n")
+cat("Model 3 - AIC:", sarima_model3$aic, " BIC:", sarima_model3$bic, "\n")
+
+# Check residuals to confirm model fit
+checkresiduals(sarima_model1)
+checkresiduals(sarima_model2)
+checkresiduals(sarima_model3)
+
+```
+
+```{r}
+# Display AIC and BIC values for all models
+cat("Auto Model - AIC:", auto_model$aic, " BIC:", auto_model$bic, "\n")
+cat("Model 1 (ARIMA(1,1,0)) - AIC:", sarima_model1$aic, " BIC:", sarima_model1$bic, "\n")
+cat("Model 2 (SARIMA(1,1,1)(1,1,0)[12]) - AIC:", sarima_model2$aic, " BIC:", sarima_model2$bic, "\n")
+cat("Model 3 (SARIMA(1,1,1)(0,1,1)[12]) - AIC:", sarima_model3$aic, " BIC:", sarima_model3$bic, "\n")
+
+# Create a summary table for easier comparison
+model_comparison <- data.frame(
+  Model = c("Auto Model", "Manual Model 1", "Manual Model 2", "Manual Model 3"),
+  AIC = c(auto_model$aic, sarima_model1$aic, sarima_model2$aic, sarima_model3$aic),
+  BIC = c(auto_model$bic, sarima_model1$bic, sarima_model2$bic, sarima_model3$bic)
+)
+
+# Print the comparison table
+print(model_comparison)
+```
+
+```{r}
+plot(sarima_model3)
+```
+
+
+```{r}
+# Forecast the next 12 months using Model 3
+forecast_sarima <- forecast(sarima_model3, h = 12)
+
+# Plot the forecast
+plot(forecast_sarima)
+
+# Store forecast results in a data frame if needed
+forecast_df <- as.data.frame(forecast_sarima)
+head(forecast_df)  # View the first few rows
+```
+
