@@ -42,6 +42,43 @@ ggplot(data1, aes(x = Time, y = Temps)) +
   xlab("Time (Months since Jan 1849)")
 ```
 
+ ```{r}
+install.packages("lmtest")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(lmtest)
+
+model <- lm(Anomaly ~ Time * MonthFactor, data = data1, weights = 1 / data1$Unc)
+summary(model)
+residuals_model <- residuals(model)
+dwtest(residuals_model ~ data1$Time)
+ggplot(data1, aes(x = Time, y = Anomaly, color = MonthFactor)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  ggtitle("Linear Regression: Anomaly vs Time (With Seasonality & Interaction)") +
+  xlab("Time (Months since Jan 1849)") +
+  ylab("Anomaly") +
+  scale_color_discrete(name = "Month")
+ggplot(data1, aes(x = MonthFactor, y = Anomaly)) +
+  geom_boxplot() +
+  ggtitle("Anomaly by Month") +
+  xlab("Month") +
+  ylab("Anomaly")
+
+
+model_temps <- lm(Temps ~ Time * MonthFactor, data = data1, weights = 1 / data1$Unc)
+summary(model_temps)
+ggplot(data1, aes(x = Time, y = Temps, color = MonthFactor)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = TRUE) +
+  ggtitle("Weighted Regression: Temps vs Time (With Seasonality & Interaction)") +
+  xlab("Time (Months since Jan 1849)") +
+  ylab("Temperature (°C)") +
+  scale_color_discrete(name = "Month")
+
+```
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 yearly_anomaly_model = lm(Anomaly ~ Year, data = data2)
 summary(yearly_anomaly_model)
