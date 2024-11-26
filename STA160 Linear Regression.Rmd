@@ -1,0 +1,68 @@
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Monthly Data
+data1 = read.csv("Sacramento Data Anomaly FULL.csv")
+data1$Time <- (data1$Year - 1849) * 12 + (data1$Month - 1)
+
+# Yearly Data
+data2 = read.csv("Sacramento Average Anomaly.csv")
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+library(ggplot2)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(data1)
+head(data2)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+monthly_model_anomaly <- lm(Anomaly ~ Time, data = data1)
+summary(monthly_model_anomaly)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+monthly_model_temps <- lm(Temps ~ Time, data = data1)
+summary(monthly_model_temps)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data1, aes(x = Time, y = Anomaly)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  ggtitle("Linear Regression: Anomaly vs Time") +
+  xlab("Time (Months since Jan 1849)")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data1, aes(x = Time, y = Temps)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  ggtitle("Linear Regression: Temps vs Time") +
+  xlab("Time (Months since Jan 1849)")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+yearly_anomaly_model = lm(Anomaly ~ Year, data = data2)
+summary(yearly_anomaly_model)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+yearly_temp_model = lm(Temps ~ Year, data = data2)
+summary(yearly_temp_model)
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+ggplot(data2, aes(x = Year, y = Anomaly)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  ggtitle("Linear Regression: Anomaly vs Year")
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+ggplot(data2, aes(x = Year, y = Temps)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  ggtitle("Linear Regression: Temps vs Year")
+```
