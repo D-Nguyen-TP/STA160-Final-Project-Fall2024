@@ -1,4 +1,4 @@
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
 library(ggplot2)
 
 # Monthly Data
@@ -8,52 +8,14 @@ data1 = read.csv("Sacramento Data Anomaly FULL.csv")
 data2 = read.csv("Sacramento Average Anomaly.csv")
 ```
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
 head(data1)
 head(data2)
 ```
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-monthly_model_anomaly <- lm(Anomaly ~ Time, data = data1)
-summary(monthly_model_anomaly)
-```
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-monthly_model_temps <- lm(Temps ~ Time, data = data1)
-summary(monthly_model_temps)
-```
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-ggplot(data1, aes(x = Time, y = Anomaly)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = TRUE, color = "blue") +
-  ggtitle("Anomaly vs Time") +
-  xlab("Time (Months since Jan 1849)") + ylab("Anomaly (in C)")
-```
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-ggplot(data1, aes(x = Time, y = Temps)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = TRUE, color = "red") +
-  ggtitle("Linear Regression: Temps vs Time") +
-  xlab("Time (Months since Jan 1849)")
-```
-
 ```{r}
+# Linear regression for temp by month for every year
 data1$MonthFactor <- as.factor(data1$Month)
-
-data1$HotMonths <- ifelse(data1$Month %in% c(5, 6, 7, 8, 9), 1, 0)
-
-model <- lm(Anomaly ~ Year * MonthFactor, data = data1, weights = 1 / data1$Unc)
-summary(model)
-
-ggplot(data1, aes(x = Year, y = Anomaly, color = MonthFactor)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = TRUE) +
-  ggtitle("Linear Regression: Anomaly vs Year (With Seasonality & Interaction)") +
-  xlab("Year") +
-  ylab("Anomaly") +
-  scale_color_discrete(name = "Month")
 
 model_temps <- lm(Temps ~ Year * MonthFactor, data = data1, weights = 1 / data1$Unc)
 summary(model_temps)
@@ -67,14 +29,18 @@ ggplot(data1, aes(x = Year, y = Temps, color = MonthFactor)) +
   scale_color_discrete(name = "Month")
 ```
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
+# Linear regression for average temp vs year
 yearly_temp_model = lm(Temps ~ Year, data = data2)
 summary(yearly_temp_model)
 ```
 
-```{r, echo=FALSE, warning = FALSE, message = FALSE}
+```{r}
+# Plot for average temp vs year
 ggplot(data2, aes(x = Year, y = Temps)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, color = "red") +
-  ggtitle("Linear Regression: Temps vs Year")
+  xlab("Year") +
+  ylab("Yearly Average Temperature (°C)") +
+  ggtitle("Linear Regression: Average Temps vs Year")
 ```
