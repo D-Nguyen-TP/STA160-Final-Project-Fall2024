@@ -1,0 +1,133 @@
+---
+title: "STA160 Final"
+output: html_document
+date: "2024-12-03"
+---
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(TTR)
+#library(ggfortify)
+library(forecast)
+library(timetk)
+library(tseries)
+library(Metrics)
+```
+
+```{r}
+data1 <- read_csv("C:/Users/L0145/Downloads/Sacramento Average Anomaly.csv")
+data2 <- read_csv("C:/Users/L0145/Downloads/Sacramento Data Anomaly FULL.csv")
+```
+
+```{r}
+reference_period_mean <- 15
+
+data2 <- data2 %>%
+  mutate(Temp = Anomaly + reference_period_mean, 
+         Date = ymd(paste(Year, Month, "01", sep = "-")))
+```
+
+```{r}
+ts_data <- ts(data2$Temp, start = c(1849, 1), frequency = 12)
+
+sarima_model <- auto.arima(ts_data, seasonal = TRUE, stepwise = FALSE, approximation = FALSE)
+
+summary(sarima_model)
+checkresiduals(sarima_model)
+```
+
+```{r}
+acf(residuals(sarima_model), main = "ACF of Residuals")
+pacf(residuals(sarima_model), main = "PACF of Residuals")
+```
+
+```{r}
+model1 <- Arima(ts_data, order = c(1,1,1), seasonal = c(0,1,1))
+model2 <- Arima(ts_data, order = c(2,1,1), seasonal = c(0,1,1))
+model3 <- Arima(ts_data, order = c(1,1,2), seasonal = c(0,1,1))
+model4 <- Arima(ts_data, order = c(1,1,1), seasonal = c(1,1,1))
+
+cat("Model 1 (SARIMA(1,1,1)(0,1,1)[12]) - AIC:", AIC(model1), "BIC:", BIC(model1), "\n")
+cat("Model 2 (SARIMA(2,1,1)(0,1,1)[12]) - AIC:", AIC(model2), "BIC:", BIC(model2), "\n")
+cat("Model 3 (SARIMA(1,1,2)(0,1,1)[12]) - AIC:", AIC(model3), "BIC:", BIC(model3), "\n")
+cat("Model 4 (SARIMA(1,1,1)(1,1,1)[12]) - AIC:", AIC(model4), "BIC:", BIC(model4), "\n")
+```
+
+```{r}
+checkresiduals(model3)
+
+acf(residuals(model3), main = "ACF of Residuals")
+pacf(residuals(model3), main = "PACF of Residuals")
+```
+
+```{r}
+model3 <- Arima(ts_data, order = c(1,1,2), seasonal = c(0,1,1))
+
+forecast_horizon <- 24
+forecast_values <- forecast(model3, h = forecast_horizon)
+
+plot(forecast_values)
+print(forecast_values)
+```
+
+```{r}
+ts_data_2019_2020 <- window(ts_data, start = c(2019, 1), end = c(2020, 12))
+
+forecast_horizon <- 24
+forecast_values <- forecast(model3, h = forecast_horizon)
+
+forecast_months <- time(forecast_values$mean)
+
+ts_data_2019_2020_df <- data.frame(
+  Date = time(ts_data_2019_2020),
+  Temperature = as.numeric(ts_data_2019_2020)
+)
+
+forecast_df <- data.frame(
+  Date = forecast_months,
+  Temperature = as.numeric(forecast_values$mean),
+  Lower = as.numeric(forecast_values$lower[, 2]),  # 95% lower bound
+  Upper = as.numeric(forecast_values$upper[, 2])   # 95% upper bound
+)
+
+combined_df <- bind_rows(ts_data_2019_2020_df, forecast_df)
+
+ggplot() +
+  geom_line(data = ts_data_2019_2020_df, aes(x = Date, y = Temperature), color = "blue") +
+  geom_line(data = forecast_df, aes(x = Date, y = Temperature), color = "red", linetype = "dashed") +
+  geom_ribbon(data = forecast_df, aes(x = Date, ymin = Lower, ymax = Upper), fill = "red", alpha = 0.2) +
+  labs(
+    title = "Forecast for the Next 2 Years",
+    x = "Year",
+    y = "Temperature (°C)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels for readability
+  )
+```
+
+```{r}
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 12) {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+    train_set <- ts_data[i:(i + window_size - 1)]
+    test_set <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+    model <- auto.arima(train_set)
+    forecast_values <- forecast(model, h = forecast_horizon)
+    forecast_error <- rmse(test_set, forecast_values$mean)
+    errors[i] <- forecast_error
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors <- rolling_window_cv(ts_data, window_size, forecast_horizon = 12)
+
+plot(errors, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Cross-Validation Errors")
+```
+
