@@ -23,24 +23,26 @@ dat = read_csv("Sacramento Average Anomaly.csv")
 ```
 
 ```{r}
-test = ts(dat$MAA, start = dat$Year[1], frequency = 1)
+test = ts(dat$Anomaly, start = dat$Year[1], frequency = 1)
 ```
 EDA Stuff
 ```{r}
-ggplot(dat, mapping = aes(x = Year, y = MAA)) + 
+ggplot(dat, mapping = aes(x = Year, y = Temps)) + 
   geom_line() + 
   #geom_ribbon(aes(x = Year, y = MAA, ymin = MAA - Unc, ymax = MAA + Unc), alpha = 0.2) + 
-  labs(title = "Sacramento Average Temperature Anomaly", x = "Years", y = "Average Anomaly") #+ 
+  labs(title = "Sacramento Average Temperatures Yearly", x = "Years", y = "Average Anomaly") #+ 
   #geom_line(aes(y = MA), color = "red") #+ 
   #geom_smooth(color = "blue", fill = "red")
+
+ggsave("Year.png", width = 10, height = 3)
 ```
 
-```{r}
+```{r, eval = FALSE}
 ggplot(dat, aes(x = Year, y = Unc)) + geom_line() + labs(title = "Uncertainty levels of Sacramento Average Anomaly")
 ```
 
 ```{r}
-series = ts(dat$MAA, start = dat$Year[1])
+series = ts(dat$Anomaly, start = dat$Year[1])
 
 autoplot(ma(series, 15))
 ```
@@ -57,7 +59,7 @@ full = ts(full_raw$Temps, start = c(full_raw$Year[1], full_raw$Month[1]), freque
 
 autoplot(full) + 
   labs(title = "Sacramento Monthly Average Temperatures", y = "Monthly Temperature")
-ggsave("test.png", width = 10, height = 3)
+ggsave("Month.png", width = 10, height = 3)
 ```
 
 
@@ -129,7 +131,20 @@ save_as_image(short_table, path = "Short_table.png")
 # Boxplots
 
 ```{r}
-ggplot(full_raw, aes(x = as.factor(Month) ,  y = Temps)) + geom_boxplot()
+ggplot(full_raw, aes(x = as.factor(Month) ,  y = Temps, fill = as.factor(Month))) + 
+  geom_boxplot() + 
+  theme(legend.position = "none") + 
+  labs(x = "Month", y = "Temperature in Celsius", title = "Sacramento Temperature Boxplots")
 
 ```
 
+```{r, eval=FALSE}
+test = auto.arima(full, seasonal = T, D = 1)
+
+autoplot(test)
+```
+
+```{r}
+forecast(test, h = 24) %>% autoplot() + scale_x_continuous(limits = c(2000, 2022))
+
+```
