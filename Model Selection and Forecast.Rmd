@@ -13,6 +13,7 @@ library(forecast)
 library(timetk)
 library(tseries)
 library(Metrics)
+library(gridExtra)
 ```
 
 ```{r}
@@ -264,7 +265,7 @@ cv_plot_subset <- ggplot(data.frame(Window = 1:length(errors_model1_subset), RMS
   geom_line(color = "red") +
   labs(title = "Rolling Window Cross-Validation Errors - Subset (1960 onwards)", x = "Window", y = "RMSE")
 
-combined_plot <- grid.arrange(cv_plot_full, cv_plot_subset, nrow = 2)
+combined_plot <- grid.arrange(cv_plot_full, cv_plot_subset, ncol = 2)
 ggsave("Rolling_CV_Comparison.png", plot = combined_plot, width = 10, height = 4)
 ```
 
