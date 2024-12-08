@@ -1,0 +1,286 @@
+---
+title: "STA Final Project v2"
+output: html_document
+date: "2024-12-08"
+---
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(TTR)
+library(forecast)
+library(timetk)
+library(tseries)
+library(Metrics)
+```
+
+```{r}
+data1 <- read_csv("C:/Users/L0145/Downloads/Sacramento Average Anomaly.csv")
+data2 <- read_csv("C:/Users/L0145/Downloads/Sacramento Data Anomaly FULL.csv")
+```
+
+```{r}
+#Generate initial model
+ts_data <- ts(data2$Temps, start = c(1849, 1), frequency = 12)
+
+sarima_model <- auto.arima(ts_data, seasonal = TRUE) #, D = 1) stepwise = FALSE, approximation = FALSE)
+
+summary(sarima_model)
+checkresiduals(sarima_model)
+```
+
+```{r}
+acf(residuals(sarima_model), main = "ACF of Residuals")
+pacf(residuals(sarima_model), main = "PACF of Residuals")
+```
+
+```{r}
+#Alternative Models
+model1 <- Arima(ts_data, order = c(1,0,0), seasonal = c(2,1,0)) # WIthout MA
+model2 <- Arima(ts_data, order = c(0,0,1), seasonal = c(2,1,0)) # Without AR
+model3 <- Arima(ts_data, order = c(1,0,1), seasonal = c(1,1,0)) #Removing 1 AR
+model4 <- Arima(ts_data, order = c(1,0,1), seasonal = c(2,0,0)) # Removing DIfferencing
+
+cat("Model 1 (SARIMA(1,0,0)(2,1,0)[12]) - AIC:", AIC(model1), "BIC:", BIC(model1), "\n")
+cat("Model 2 (SARIMA(0,0,1)(2,1,0)[12]) - AIC:", AIC(model2), "BIC:", BIC(model2), "\n")
+cat("Model 3 (SARIMA(1,0,1)(1,1,0)[12]) - AIC:", AIC(model3), "BIC:", BIC(model3), "\n")
+cat("Model 4 (SARIMA(1,0,1)(2,0,0)[12]) - AIC:", AIC(model4), "BIC:", BIC(model4), "\n")
+```
+
+```{r}
+#Rolling Window CV - Auto Model
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 12) {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+
+    train_setA <- ts_data[i:(i + window_size - 1)]
+    test_setA <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+
+    modelA <- auto.arima(train_setA, seasonal = TRUE, stepwise = FALSE, approximation = FALSE)
+
+    forecast_values <- forecast(modelA, h = forecast_horizon)
+
+    forecast_error <- rmse(test_setA, forecast_values$mean)
+    errors[i] <- forecast_error
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors_modelA <- rolling_window_cv(ts_data, window_size, forecast_horizon = 12)
+
+plot(errors_modelA, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Cross-Validation Errors")
+```
+
+```{r}
+#Rolling Window CV - Model 1
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 12) {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+    train_set <- ts_data[i:(i + window_size - 1)]
+    test_set <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+    model1 <- arima(train_set, order = c(1, 0, 0), seasonal = c(2, 1, 0))
+    forecast_values <- forecast(model1, h = forecast_horizon)
+    forecast_error <- rmse(test_set, forecast_values$mean)
+    errors[i] <- forecast_error
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors_model1 <- rolling_window_cv(ts_data, window_size, forecast_horizon = 12)
+
+plot(errors_model1, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Cross-Validation Errors")
+```
+
+```{r}
+#Rolling Window CV - Model 2
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 24) {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+  
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+    train_set <- ts_data[i:(i + window_size - 1)]
+    test_set <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+    
+    model2 <- NULL
+    
+    tryCatch({
+      model2 <- Arima(train_set,order = c(0, 0, 1),seasonal = list(order = c(2, 1, 0), period = 12), method = "ML")
+    }, error = function(e) {
+      # Fallback to auto.arima in case of failure
+      model2 <- auto.arima(train_set, seasonal = TRUE)
+      warning(paste("Auto ARIMA fallback used at iteration", i))
+    })
+    
+    if (!is.null(model2)) {
+      forecast_values <- forecast(model2, h = forecast_horizon)
+      forecast_error <- rmse(test_set, forecast_values$mean)
+      errors[i] <- forecast_error
+    }
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors_model2 <- rolling_window_cv(ts_data, window_size, forecast_horizon = 12)
+
+plot(errors_model2, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Cross-Validation Errors - Model 2")
+```
+
+```{r}
+#Rolling Window CV - Model 3
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 12, model_type = "Model 3") {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+  
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+    train_set <- ts_data[i:(i + window_size - 1)]
+    test_set <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+    
+    model <- NULL
+    tryCatch({
+      if (model_type == "Model 3") {
+        model <- Arima(train_set, order = c(1, 0, 1), seasonal = list(order = c(1, 1, 0), period = 12))
+      }
+    }, error = function(e) {
+      model <- auto.arima(train_set, seasonal = TRUE)
+      warning(paste("Auto ARIMA fallback used at iteration", i))
+    })
+    
+    if (!is.null(model)) {
+      forecast_values <- forecast(model, h = forecast_horizon)
+      forecast_error <- rmse(test_set, forecast_values$mean)
+      errors[i] <- forecast_error
+    }
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors_model3 <- rolling_window_cv(ts_data, window_size, forecast_horizon = 12, model_type = "Model 3")
+plot(errors_model3, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Errors - Model 3")
+```
+
+```{r}
+#Rolling Window CV - Model 4
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 12) {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+  
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+    train_set <- ts_data[i:(i + window_size - 1)]
+    test_set <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+    
+    model4 <- NULL
+    
+    tryCatch({
+      model4 <- Arima(train_set,order = c(0, 0, 1),seasonal = list(order = c(2, 1, 0), period = 12),method = "ML")
+    }, error = function(e) {
+      model4 <- auto.arima(train_set, seasonal = TRUE)
+      warning(paste("Auto ARIMA fallback used at iteration", i))
+    })
+    
+    if (!is.null(model4)) {
+      forecast_values <- forecast(model4, h = forecast_horizon)
+      forecast_error <- rmse(test_set, forecast_values$mean)
+      errors[i] <- forecast_error
+    }
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors_model4 <- rolling_window_cv(ts_data, window_size, forecast_horizon = 12)
+
+plot(errors_model4, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Cross-Validation Errors - Model 4")
+```
+
+```{r}
+#Combined Rolling Window CV plots
+errors_df <- data.frame(
+  Window = 1:length(errors_model1),
+  Model1 = errors_model1,
+  Model2 = errors_model2,
+  Model3 = errors_model3,
+  Model4 = errors_model4,
+  AutoArima = errors_auto
+)
+
+errors_long <- errors_df %>%
+  pivot_longer(cols = -Window, names_to = "Model", values_to = "RMSE")
+
+rolling_cv_plot <- ggplot(errors_long, aes(x = Window, y = RMSE, color = Model)) +
+  geom_line() +
+  facet_wrap(~Model, ncol = 1, scales = "free_y") +
+  theme(
+    strip.text = element_text(size = 10, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  ) +
+  labs(
+    title = "Rolling Window Cross-Validation Errors for All Models",
+    x = "Window",
+    y = "RMSE"
+  )
+
+ggsave("Rolling_Window_CV_Errors.png", plot = rolling_cv_plot, width = 20, height = 12)
+```
+
+```{r}
+# Rolling Window CV - subset
+start_year <- 1960
+subset_data <- ts_data[which(time(ts_data) >= start_year)]
+
+rolling_window_cv <- function(ts_data, window_size, forecast_horizon = 12) {
+  errors <- numeric(length(ts_data) - window_size - forecast_horizon + 1)
+
+  for (i in 1:(length(ts_data) - window_size - forecast_horizon + 1)) {
+    train_set <- ts_data[i:(i + window_size - 1)]
+    test_set <- ts_data[(i + window_size):(i + window_size + forecast_horizon - 1)]
+
+    model1 <- arima(train_set, order = c(1, 1, 1), seasonal = list(order = c(0, 1, 1), period = 12))
+    
+    forecast_values <- forecast(model1, h = forecast_horizon)
+    forecast_error <- rmse(test_set, forecast_values$mean)
+    errors[i] <- forecast_error
+  }
+  return(errors)
+}
+
+window_size <- 120
+errors_model1_subset <- rolling_window_cv(subset_data, window_size, forecast_horizon = 12)
+
+plot(errors_model1_subset, type = "l", col = "blue", xlab = "Window", ylab = "RMSE", main = "Rolling Window Cross-Validation Errors for Model 1 (Subset from 1960)")
+```
+
+```{r}
+#Full dataset
+cv_plot_full <- ggplot(data.frame(Window = 1:length(errors_model1), RMSE = errors_model1), aes(x = Window, y = RMSE)) +
+  geom_line(color = "blue") +
+  labs(title = "Rolling Window Cross-Validation Errors - Full Dataset", x = "Window", y = "RMSE")
+
+#Subset dataset
+cv_plot_subset <- ggplot(data.frame(Window = 1:length(errors_model1_subset), RMSE = errors_model1_subset), aes(x = Window, y = RMSE)) +
+  geom_line(color = "red") +
+  labs(title = "Rolling Window Cross-Validation Errors - Subset (1960 onwards)", x = "Window", y = "RMSE")
+
+combined_plot <- grid.arrange(cv_plot_full, cv_plot_subset, nrow = 2)
+ggsave("Rolling_CV_Comparison.png", plot = combined_plot, width = 10, height = 4)
+```
+
+```{r}
+# Forecast on subset from 1960 onwards
+subset_data <- window(ts_data, start = c(1960, 1))
+model1_subset <- arima(subset_data, order = c(1, 0, 0), seasonal = list(order = c(2, 1, 0), period = 12))
+
+forecast_horizon <- 240
+forecast_values_subset <- forecast(model1_subset, h = forecast_horizon)
+
+forecast_plot <- autoplot(forecast_values_subset) + 
+  labs(title = "Forecast for the Next 20 Years", 
+       y = "Temperature (C)", 
+       x = "Year")
+
+ggsave("Forecast.png", plot = forecast_plot, width = 10, height = 3)
+```
+
