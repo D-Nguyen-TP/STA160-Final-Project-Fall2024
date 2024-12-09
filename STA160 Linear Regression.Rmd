@@ -27,20 +27,38 @@ ggplot(data1, aes(x = Year, y = Temps, color = MonthFactor)) +
   xlab("Year") +
   ylab("Temperature (°C)") +
   scale_color_discrete(name = "Month")
+
+data1$residuals <- resid(model_temps)
+
+ggplot(data1, aes(x = Year, y = residuals, color = MonthFactor)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  xlab("Year") +
+  ylab("Residuals") +
+  ggtitle("Residual Plot: Weighted Regression with Seasonality") +
+  scale_color_discrete(name = "Month") +
+  theme_minimal()
 ```
 
 ```{r}
 # Linear regression for average temp vs year
-yearly_temp_model = lm(Temps ~ Year, data = data2)
+yearly_temp_model = lm(Temps ~ Year, data = data2, weights = 1 / data2$Uncertainty)
 summary(yearly_temp_model)
-```
 
-```{r}
 # Plot for average temp vs year
 ggplot(data2, aes(x = Year, y = Temps)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, color = "red") +
   xlab("Year") +
   ylab("Yearly Average Temperature (°C)") +
-  ggtitle("Linear Regression: Average Temps vs Year")
+  ggtitle("Weighted Linear Regression: Average Temps vs Year")
+
+data2$residuals <- resid(yearly_temp_model)
+ggplot(data2, aes(x = Year, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  xlab("Year") +
+  ylab("Residuals") +
+  ggtitle("Residual Plot: Weighted Linear Regression of Temps vs Year") +
+  theme_minimal()
 ```
