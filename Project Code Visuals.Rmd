@@ -38,11 +38,6 @@ ggsave("Year.png", width = 10, height = 3)
 ```
 
 
-```{r}
-series = ts(dat$Anomaly, start = dat$Year[1]) # DISCARDED
-
-autoplot(ma(series, 15))
-```
 
 ```{r}
 full_raw = read_csv("Sacramento Data Anomaly FULL.csv")
